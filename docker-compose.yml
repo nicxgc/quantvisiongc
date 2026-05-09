@@ -1,0 +1,29 @@
+# ============================================================
+# QuantVisionGC - Orquestación de servicios
+# ============================================================
+# Por ahora solo levanta la base de datos PostgreSQL+TimescaleDB.
+# El backend se ejecuta en local con uvicorn durante el desarrollo.
+# En tareas futuras se añadirán los servicios de backend y frontend.
+# ============================================================
+
+services:
+  db:
+    image: timescale/timescaledb:2.17.2-pg16
+    container_name: quantvisiongc_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

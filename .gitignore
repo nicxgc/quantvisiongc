@@ -1,0 +1,53 @@
+# ============================================================
+# QuantVisionGC - .gitignore
+# ============================================================
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# === Entornos virtuales ===
+backend/venv/
+venv/
+ENV/
+env/
+
+# === Variables de entorno (contienen secretos) ===
+.env
+.env.local
+*.env.local
+# El .env.example SÍ se sube, es la plantilla pública.
+
+# === IDEs y editores ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === Sistema operativo ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Logs ===
+*.log
+logs/
+
+# === Bases de datos locales (por si acaso) ===
+*.sqlite
+*.sqlite3
+*.db
+
+# === Frontend (futuro) ===
+node_modules/
+dist/
+build/
+
+# === Testing y coverage ===
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
