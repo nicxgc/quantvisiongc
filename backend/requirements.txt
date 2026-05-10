@@ -15,7 +15,7 @@ pydantic-settings==2.5.2
 # === Base de datos ===
 sqlalchemy==2.0.36
 alembic==1.13.3
-psycopg2-binary==2.9.9
+psycopg[binary]==3.2.3
 
 # === Seguridad ===
 python-jose[cryptography]==3.3.0
