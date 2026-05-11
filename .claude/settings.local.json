@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd \"c:\\\\TFG\\\\quantvisiongc\\\\backend\"; .\\\\venv\\\\Scripts\\\\Activate.ps1; alembic init alembic; Write-Host \"EXIT:$LASTEXITCODE\")",
+      "PowerShell(cd \"c:\\\\TFG\\\\quantvisiongc\\\\backend\"; .\\\\venv\\\\Scripts\\\\Activate.ps1; alembic revision -m \"inicial - configuracion alembic\"; Write-Host \"EXIT:$LASTEXITCODE\")",
+      "PowerShell(cd \"c:\\\\TFG\\\\quantvisiongc\\\\backend\"; .\\\\venv\\\\Scripts\\\\Activate.ps1; alembic upgrade head; Write-Host \"EXIT:$LASTEXITCODE\")",
+      "PowerShell(docker exec -it quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"\\\\dt\")",
+      "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"\\\\dt\")"
+    ]
+  }
+}
