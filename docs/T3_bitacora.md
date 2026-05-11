@@ -110,3 +110,116 @@ Por su volumen, divido la jornada en dos bloques: primero el levantamiento del e
 Subtarea 3.2 cerrada. Mañana lunes 11/05 empiezo con las subtareas 3.5 y 3.6: modelos SQLAlchemy de las cuatro entidades (`usuario`, `estrategia`, `resultado_estrategia`, `contratacion`), primera migración real con `--autogenerate` y schemas Pydantic base.
 
 ---
+
+
+---
+
+## 2026-05-11 (Lunes) — Subtareas 3.5 y 3.6: modelos, migración inicial y schemas
+
+Jornada con tres bloques encadenados: primero los modelos SQLAlchemy de las 4 entidades, después la primera migración real con `--autogenerate`, y al final los schemas Pydantic. Resuelta una incidencia interesante de comportamiento por defecto de SQLAlchemy con enums.
+
+### Bloque 1 — Modelos SQLAlchemy
+
+#### Qué he hecho
+
+- Creado `backend/app/models/` con los 4 modelos correspondientes a las Tablas 3.27, 3.28+3.29+3.30, 3.31 y 3.32 de la memoria:
+  - `usuario.py` — entidad fuerte con su `RolUsuario(str, Enum)`.
+  - `estrategia.py` — entidad fuerte con 25 atributos organizados en 3 bloques separados por comentarios (descriptivos, métricas resumen y escenarios históricos), y enum `EstadoEstrategia`.
+  - `resultado_estrategia.py` — entidad débil con PK compuesta `(id_estrategia, fecha)` declarada vía `PrimaryKeyConstraint` en `__table_args__`.
+  - `contratacion.py` — entidad asociativa con id propio y enum `EstadoContratacion`.
+- Sintaxis moderna de SQLAlchemy 2.0 en todos los modelos: `Mapped[...]` + `mapped_column()` con type hints completos.
+- `app/models/__init__.py` que reexporta las 4 clases y sus enums, para que Alembic los detecte vía el import en `env.py`.
+- Descomentado el import de modelos en `alembic/env.py`.
+
+#### Decisiones tomadas
+
+- **Los 25 atributos de `estrategia` conviven en una sola tabla.** Los bloques de métricas (Tabla 3.29) y escenarios (Tabla 3.30) son valores derivados pre-calculados externamente por el sistema que genera las estrategias, por lo que se almacenan como snapshot directamente en `estrategia`. Esto evita un `JOIN` extra en cada consulta del catálogo (alineado con el RNF-09: respuestas en menos de 2 s) y refleja fielmente cómo llegan los datos al backend.
+- **Los campos de los bloques 2 y 3 son `nullable`.** Cuando un administrador crea una estrategia recién registrada todavía no hay datos ingeridos, por lo que esos campos quedan `NULL` hasta la primera ingesta.
+- **`ON DELETE CASCADE`** en `resultado_estrategia → estrategia`: si se borra la estrategia padre, sus resultados históricos también desaparecen (son datos derivados sin valor por sí mismos).
+- **`ON DELETE RESTRICT`** en las dos FKs de `contratacion`: borrar un usuario o una estrategia que tenga contrataciones es semánticamente sospechoso, así que la BBDD lo bloquea y fuerza al admin a cancelarlas explícitamente antes.
+- **`CheckConstraint`** en `nivel_riesgo` para garantizar el rango 1..7 a nivel de BBDD, no solo en la capa Pydantic.
+
+#### Pequeñas correcciones de nomenclatura frente al diseño teórico
+
+Tres ajustes documentados para mantener trazabilidad con la memoria, sin desviarse del diseño:
+
+| En la Tarea 2 | En código | Motivo |
+|---|---|---|
+| `comisión_ganancias` (con tilde) | `comision_ganancias` | Las tildes en nombres de columna PostgreSQL son muy problemáticas (obligan a entrecomillar siempre). |
+| `ide_usuario` | `id_usuario` | Typo detectado en la Tabla 3.32. |
+| `rol` con valor `'usuario'` (mi propuesta inicial) | `rol` con valor `'user'` | Respetar el diseño original de la Tabla 3.27. |
+
+### Bloque 2 — Migración inicial con `--autogenerate`
+
+#### Qué he hecho
+
+- Generada la primera migración real con `alembic revision --autogenerate -m "crear entidades iniciales"`.
+- Revisado el archivo generado a mano antes de aplicar, comprobando:
+  - El orden de creación respeta las dependencias de FK (`estrategia` → `usuario` → `contratacion` → `resultado_estrategia`).
+  - El `CheckConstraint` de `nivel_riesgo` aparece correctamente.
+  - La PK compuesta de `resultado_estrategia` está bien declarada con su nombre explícito (`pk_resultado_estrategia`).
+  - Las precisiones `Numeric` coinciden con las tablas de la memoria.
+  - El `downgrade()` invierte el orden de creación correctamente.
+- Aplicada con `alembic upgrade head` (hash `3f84bb494760`).
+- Verificado en PostgreSQL: 5 tablas (4 nuevas + `alembic_version`), 3 tipos ENUM y los 8 índices esperados.
+
+#### Incidencia detectada y resuelta — Valores ENUM en mayúsculas
+
+Al revisar la primera versión de la migración detecté que SQLAlchemy generaba los tipos ENUM de PostgreSQL con los valores en **mayúsculas** (`'ACTIVA'`, `'PAUSADA'`, `'ADMIN'`, `'USER'`, `'CANCELADA'`) en lugar de en minúsculas como especifica el diseño de la Tarea 2 (Tablas 3.27, 3.28 y 3.32).
+
+**Causa**: SQLAlchemy serializa por defecto el `NAME` de cada miembro de un Python `Enum`, no su `VALUE`. Con la declaración:
+
+```python
+class RolUsuario(str, Enum):
+    ADMIN = "admin"  # NAME=ADMIN, VALUE="admin"
+    USER = "user"
+```
+
+SQLAlchemy elegía el `NAME` (mayúsculas) para crear el tipo ENUM de PostgreSQL.
+
+**Por qué importa**: el frontend y la API trabajan con JSON tipo `{"rol": "admin"}` (minúsculas, por convención REST). Si la BBDD esperase `"ADMIN"`, todas las inserciones fallarían en validación.
+
+**Solución aplicada**: añadir `values_callable=lambda x: [e.value for e in x]` en las tres llamadas a `Enum(...)` de los modelos (`usuario.rol`, `estrategia.estado`, `contratacion.estado`). Eso fuerza a SQLAlchemy a usar el `VALUE` en lugar del `NAME`.
+
+Tras el cambio, eliminé el archivo de migración incorrecto y regeneré con `alembic revision --autogenerate`. La nueva migración (hash `3f84bb494760`) usa los valores correctos en minúsculas, alineados con el diseño.
+
+### Bloque 3 — Schemas Pydantic base
+
+#### Qué he hecho
+
+- Instalado el paquete `email-validator` (necesario para `EmailStr` de Pydantic v2) mediante `pip install "pydantic[email]==2.9.2"`. Añadido al `requirements.txt`.
+- Creados 5 archivos en `backend/app/schemas/` siguiendo el patrón **Base / Create / Update / Read** por entidad:
+  - `usuario.py` — con `EmailStr` para validar correo y password en plano para creación (nunca se expone `password_hash` en Read).
+  - `estrategia.py` — `Base` con los 8 campos descriptivos; `Read` añade id, estado, timestamps y los 13 campos de métricas + escenarios como `Optional[Decimal]` (porque pueden ser `NULL` hasta la primera ingesta).
+  - `resultado_estrategia.py` — con `drawdown` validado como `<= 0` mediante `Field(le=0)`.
+  - `contratacion.py` — `Base` solo contiene `id_estrategia`; el `id_usuario` se extraerá del JWT en el endpoint, no del body, para evitar que un usuario contrate en nombre de otro.
+- `app/schemas/__init__.py` reexporta todos los schemas agrupados por entidad.
+- Sanity check con `python -c "from app.schemas import ..."` y arranque limpio del servidor uvicorn (sin errores de import).
+
+#### Decisiones tomadas
+
+- **Patrón Base/Create/Update/Read** consistente en las cuatro entidades, aunque `ResultadoEstrategia` y `Contratacion` no necesiten `Update` (los resultados se reemplazan por lotes desde la ingesta y las contrataciones solo se cancelan vía endpoint dedicado).
+- **`from_attributes=True`** en todos los Read para poder construir el schema directamente desde objetos SQLAlchemy con `EstrategiaRead.model_validate(estrategia_orm)`.
+- **Las métricas calculadas no se editan manualmente** desde `EstrategiaUpdate`. Solo el bloque descriptivo + estado son editables por API; el resto se rellena por ingesta.
+- **`Field(..., description="...")`** en campos con validación, para que las descripciones aparezcan automáticamente en la documentación de Swagger UI.
+
+### Evidencias del día
+
+| Archivo | Contenido |
+|---|---|
+| `docs/evidencias/T3/13_migracion_aplicada.png` | Salida de `alembic upgrade head` con el hash de la migración. |
+| `docs/evidencias/T3/14_tablas_creadas.png` | `\dt` mostrando las 5 tablas. |
+| `docs/evidencias/T3/15_pk_compuesta.png` | `\d resultado_estrategia` con la PK compuesta y la FK CASCADE. |
+| `docs/evidencias/T3/16_tipos_enum.png` | `\dT+` con los 3 ENUMs y sus valores en minúsculas. |
+| `docs/evidencias/T3/17_alembic_current_post_upgrade.png` | `alembic current` indicando `3f84bb494760 (head)`. |
+| `docs/evidencias/T3/18_modelos_directorio.png` | VS Code con `app/models/` y `estrategia.py` abiertos. |
+| `docs/evidencias/T3/19_schemas_directorio.png` | VS Code con `app/schemas/` y `usuario.py` abiertos. |
+| `docs/evidencias/T3/20_swagger_post_modelos.png` | Swagger UI con `/health` operativo tras los cambios del día. |
+
+### Tiempo invertido
+
+~4 h (≈1 h 30 min modelos + ≈1 h migración con incidencia ENUM + ≈1 h schemas + ≈30 min capturas, bitácora y commit). Dentro del rango previsto en el plan.
+
+### Estado al cierre del día
+
+Subtareas 3.5 y 3.6 cerradas. Mañana martes 12/05 entro en el **Bloque 3.3 + auth**: endpoints de registro y login, generación y validación de JWT, y las dependencias `get_current_user` / `require_admin` que protegerán el resto de endpoints.
