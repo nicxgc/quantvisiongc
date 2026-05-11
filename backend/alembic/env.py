@@ -22,8 +22,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.config import settings  # noqa: E402
 from app.core.database import Base  # noqa: E402
 
-# Importar aquí los modelos cuando existan para que autogenerate los detecte:
-# from app.models import usuario, estrategia, resultado_estrategia, contratacion  # noqa
+# Importar los módulos de modelos para que Alembic los registre en la metadata
+# y los detecte al generar migraciones con --autogenerate.
+from app.models import (  # noqa: F401
+    usuario,
+    estrategia,
+    resultado_estrategia,
+    contratacion,
+)
 
 # ---------------------------------------------------------------------------
 # Configuración estándar de Alembic
