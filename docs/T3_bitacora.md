@@ -223,3 +223,92 @@ Tras el cambio, eliminé el archivo de migración incorrecto y regeneré con `al
 ### Estado al cierre del día
 
 Subtareas 3.5 y 3.6 cerradas. Mañana martes 12/05 entro en el **Bloque 3.3 + auth**: endpoints de registro y login, generación y validación de JWT, y las dependencias `get_current_user` / `require_admin` que protegerán el resto de endpoints.
+
+---
+
+## 2026-05-12 (Martes) — Subtarea 3.3 (auth): autenticación, JWT y dependencias
+
+Jornada centrada en montar todo el sistema de autenticación y autorización del backend. Tres bloques encadenados: cimientos (utilidades de seguridad + dependencias), capa de aplicación (servicio + endpoints), y verificación end-to-end en Swagger.
+
+### Bloque 1 — Módulos de seguridad (`security.py` + `deps.py`)
+
+#### Qué he hecho
+
+- Creado `app/core/security.py` con cuatro funciones puras: `hash_password`, `verify_password`, `create_access_token` y `decode_access_token`. Usa `passlib.context.CryptContext` con bcrypt para las contraseñas y `python-jose` para los JWT. El módulo no contiene lógica HTTP ni de negocio: solo primitivas reutilizables.
+- Creado `app/core/deps.py` con las dependencias de FastAPI:
+  - `oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")` — la URL completa es importante para que Swagger UI sepa de dónde sacar el token al pulsar **Authorize**.
+  - `get_current_user(token, db)` — decodifica el JWT, extrae el `sub` (id del usuario), lo busca en BBDD y devuelve el objeto `Usuario`. Lanza 401 si cualquier paso falla (token inválido, expirado, usuario inexistente).
+  - `require_admin(current)` — encadena `get_current_user` y valida que `current.rol == RolUsuario.ADMIN`. Lanza 403 si no.
+- Uso sistemático de `Annotated[..., Depends(...)]` como sintaxis moderna recomendada por FastAPI.
+
+#### Decisiones tomadas
+
+- **Almacenar el `id` del usuario como `sub` del JWT, no el correo.** El id es estable e inmutable; si en el futuro permitimos cambiar el correo, los tokens emitidos antes seguirían siendo válidos.
+- **Token de 60 minutos** (`ACCESS_TOKEN_EXPIRE_MINUTES=60` en `config.py`). Es un equilibrio razonable: suficientemente largo para no interrumpir el trabajo del usuario, suficientemente corto para limitar el daño si el token se filtra. Para refresh tokens haría falta más infraestructura (almacén en BBDD, revocación, etc.); queda fuera del alcance del TFG.
+- **HS256 como algoritmo de firma**. Simétrico, suficiente para un sistema con un solo servicio backend. Si en el futuro se separase en microservicios, habría que migrar a RS256 (asimétrico).
+- **`get_current_user` consulta la BBDD en cada petición** en lugar de confiar solo en el payload del JWT. Penaliza un poco el rendimiento, pero garantiza que un usuario eliminado o deshabilitado pierde acceso inmediato, sin esperar a que su token expire.
+
+### Bloque 2 — Servicio, router y registro en main
+
+#### Qué he hecho
+
+- Creado `app/services/usuario_service.py` con dos funciones:
+  - `create_usuario(db, data)` — construye el objeto `Usuario`, hashea la contraseña con `hash_password`, intenta el commit. Si la BBDD devuelve `IntegrityError` por correo duplicado, hace `rollback` y lanza `ValueError("El correo ya está registrado")`. Devuelve el usuario refrescado.
+  - `authenticate_usuario(db, correo, password)` — busca el usuario por correo, verifica la contraseña con `verify_password`, devuelve el `Usuario` si todo OK o `None` si no.
+- Creado `app/routers/auth.py` con tres endpoints bajo el prefijo `/api/v1` y el tag `auth`:
+  - `POST /users/register` — recibe `UsuarioCreate`, llama al servicio, devuelve `UsuarioRead` con código 201. Convierte `ValueError` en `HTTPException(400, ...)`.
+  - `POST /auth/login` — usa `OAuth2PasswordRequestForm` como dependencia (form-data, no JSON; es el estándar OAuth2 y lo que Swagger UI espera nativamente). El campo `username` del formulario contiene el correo. Si las credenciales son válidas, devuelve `{access_token, token_type: "bearer"}`.
+  - `GET /users/me` — endpoint mínimo de prueba que devuelve el usuario autenticado. Inyecta `get_current_user` como dependencia.
+- Modificado `app/main.py` para registrar el nuevo router con `app.include_router(auth.router)`. No se ha tocado nada más del archivo.
+
+#### Decisiones tomadas
+
+- **El rol por defecto en el registro público es `user`.** No hay forma de crear un admin desde la API pública: los admins se crearán a mano por seed o por un script de bootstrap más adelante. Esto evita escaladas de privilegios accidentales.
+- **El campo `username` del formulario OAuth2 contiene el correo.** Aunque el nombre del campo sea "username" por convención del estándar, semánticamente es nuestro identificador único (el correo). Documentado como comentario en el router.
+- **La lógica de negocio vive en el servicio, no en el router.** El router solo orquesta: recibe entrada, llama al servicio, formatea salida. Esta separación se mantendrá en todos los routers que cree a partir de mañana (estrategias, contrataciones, etc.).
+
+### Bloque 3 — Prueba end-to-end en Swagger UI
+
+Verificadas en `/docs` las siete situaciones críticas del flujo de autenticación:
+
+| Prueba | Resultado esperado | Resultado obtenido |
+|---|---|---|
+| 1. Registro con datos válidos | 201 + datos del usuario sin `password_hash` | ✅ |
+| 2. Registro con correo duplicado | 400 + `"El correo ya está registrado"` | ✅ |
+| 3. Login con credenciales válidas | 200 + `access_token` válido | ✅ |
+| 4. `/users/me` sin autorización | 401 + `"Not authenticated"` | ✅ |
+| 5. `/users/me` con token válido | 200 + datos del usuario autenticado | ✅ |
+| 6. Login con contraseña incorrecta | 401 + `"Credenciales incorrectas"` | ✅ |
+| 7. Verificación en BBDD del hash | `password_hash` con formato `$2b$12$...` (bcrypt) | ✅ |
+
+Para la prueba 5, se usó el botón **Authorize** de Swagger UI, que llama internamente a `/api/v1/auth/login` con las credenciales introducidas y guarda el token devuelto para usarlo automáticamente en peticiones siguientes (cabecera `Authorization: Bearer <token>`).
+
+### Conexión con el catálogo de la memoria
+
+Lo implementado hoy cubre:
+
+- **RF-01** (registro de usuarios), **RF-02** (autenticación) y **RF-03** (gestión de sesión basada en token).
+- **RNF-01** (almacenamiento seguro de credenciales mediante hash) y **RNF-02** (autenticación basada en tokens firmados).
+- **RNF-03** (control de acceso por roles) queda implementado en la dependencia `require_admin`, aunque su primer uso real en endpoints será mañana, al proteger el CRUD de estrategias.
+- **DA-02** (driver de autenticación) y **DA-03** (driver de autorización por roles) del capítulo 3 de la memoria.
+
+### Evidencias del día
+
+| Archivo | Contenido |
+|---|---|
+| `docs/evidencias/T3/21_swagger_auth_endpoints.png` | Swagger UI con los 3 endpoints nuevos bajo el tag `auth`. |
+| `docs/evidencias/T3/22_register_201.png` | `POST /users/register` → 201 con datos sin `password_hash`. |
+| `docs/evidencias/T3/23_register_duplicado_400.png` | Registro duplicado → 400. |
+| `docs/evidencias/T3/24_login_token.png` | `POST /auth/login` → 200 con `access_token`. |
+| `docs/evidencias/T3/25_me_sin_token_401.png` | `/users/me` sin autorización → 401. |
+| `docs/evidencias/T3/26_me_con_token_200.png` | `/users/me` con token → 200 con datos del usuario. |
+| `docs/evidencias/T3/27_login_password_erroneo_401.png` | Login con contraseña incorrecta → 401. |
+| `docs/evidencias/T3/28_usuario_en_bbdd.png` | Fila del usuario en `psql` con `password_hash` en formato bcrypt. |
+
+### Tiempo invertido
+
+~3 h 30 min (≈45 min cimientos + ≈1 h capa de aplicación + ≈45 min pruebas y capturas + ≈30 min commit y bitácora).
+
+### Estado al cierre del día
+
+Subtarea 3.3 (auth) cerrada. El sistema de autenticación está operativo y verificado end-to-end. Mañana miércoles 13/05 entra el **CRUD completo de estrategias protegido por rol admin**, que será la primera aplicación real de la dependencia `require_admin` en endpoints reales.
