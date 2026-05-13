@@ -109,3 +109,4 @@ class EstrategiaRead(EstrategiaBase):
     peor_3m: Optional[Decimal] = Field(default=None, description="Peor retorno en ventana de 3 meses.")
     mejor_1a: Optional[Decimal] = Field(default=None, description="Mejor retorno en ventana de 1 año.")
     peor_1a: Optional[Decimal] = Field(default=None, description="Peor retorno en ventana de 1 año.")
+    activa: bool = Field(..., description="False indica soft delete: la estrategia está desactivada pero sus datos se conservan.")

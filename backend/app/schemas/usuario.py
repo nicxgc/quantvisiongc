@@ -1,6 +1,7 @@
 """Schemas Pydantic v2 para la entidad Usuario."""
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -53,3 +54,4 @@ class UsuarioRead(UsuarioBase):
     id: int = Field(..., description="Identificador único del usuario.")
     rol: RolUsuario = Field(..., description="Rol del usuario en el sistema: 'admin' o 'user'.")
     fecha_registro: datetime = Field(..., description="Fecha y hora de registro con timezone.")
+    saldo_monedero: Decimal = Field(..., description="Saldo disponible en el monedero virtual del usuario.")

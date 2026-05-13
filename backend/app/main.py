@@ -8,7 +8,7 @@ e incluye los routers de cada módulo funcional.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import auth, health
+from app.routers import auth, estrategias, health
 
 app = FastAPI(
     title="QuantVisionGC API",
@@ -30,6 +30,7 @@ app.add_middleware(
 # Registro de routers
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(estrategias.router, prefix="/api/v1")
 
 
 @app.get("/")

@@ -2,9 +2,10 @@
 
 import enum
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, String, func
+from sqlalchemy import DateTime, Enum, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -35,6 +36,10 @@ class Usuario(Base):
     fecha_registro: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
+    )
+    saldo_monedero: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        default=Decimal("10000.00"),
     )
 
     # Relación 1-N: un usuario puede tener varias contrataciones

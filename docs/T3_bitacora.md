@@ -312,3 +312,137 @@ Lo implementado hoy cubre:
 ### Estado al cierre del día
 
 Subtarea 3.3 (auth) cerrada. El sistema de autenticación está operativo y verificado end-to-end. Mañana miércoles 13/05 entra el **CRUD completo de estrategias protegido por rol admin**, que será la primera aplicación real de la dependencia `require_admin` en endpoints reales.
+
+
+## Miércoles 13/05/2026 — Bloque 3.3 (CRUD de estrategias)
+
+### Objetivo del día
+Implementar el CRUD completo de la entidad estrategia con endpoints
+de escritura restringidos a rol admin y endpoints de lectura públicos.
+Incluir borrado lógico (*soft delete*) que cancele en cascada las
+contrataciones activas y devuelva el dinero invertido al monedero
+del usuario propietario.
+
+### Decisiones de diseño
+1. **Visibilidad de los GET pública.** Tanto el catálogo (`GET
+   /api/v1/estrategias`) como el detalle (`GET /api/v1/estrategias/{id}`)
+   son accesibles sin autenticación, reflejando el modelo habitual de
+   plataformas de inversión donde un visitante explora la oferta antes
+   de registrarse.
+2. **Introducción del monedero del usuario.** Cada usuario dispone de
+   un campo `saldo_monedero` (Decimal 12,2) con valor inicial 10.000 €
+   al registrarse. Decisión añadida hoy fuera del plan original; obliga
+   a actualizar el documento de Tarea 2 (Análisis y Diseño) antes del
+   cierre de la Tarea 3.
+3. **Soft delete con devolución automática.** El endpoint DELETE no
+   borra físicamente la estrategia, sino que pone `activa = False`,
+   cancela todas las contrataciones activas y devuelve el
+   `monto_invertido` de cada una al `saldo_monedero` del usuario
+   correspondiente, todo en una transacción atómica.
+4. **PATCH en lugar de PUT.** Dada la elevada cardinalidad de
+   atributos de la entidad estrategia (26 columnas), las
+   actualizaciones se realizan vía PATCH con `exclude_unset=True`
+   para evitar que omitir un campo signifique borrarlo.
+5. **Ubicación temporal de la lógica de cancelación.** La cancelación
+   de contrataciones reside provisionalmente en `estrategia_service`;
+   se extraerá mañana al nuevo `contratacion_service` cuando se
+   implementen los endpoints de contratación por parte del usuario.
+
+### Cambios realizados
+- **Modelos (`app/models/`):**
+  - `usuario.Usuario`: nuevo campo `saldo_monedero` Numeric(12,2).
+  - `estrategia.Estrategia`: nuevo campo `activa` Boolean.
+  - `contratacion.Contratacion`: nuevo campo `monto_invertido`
+    Numeric(12,2).
+- **Migración Alembic `bc3f4b90342a`.** Aplicada con un ajuste manual:
+  `server_default=sa.text("10000.00")` en la columna `saldo_monedero`
+  para que las filas existentes de `usuario` recibieran el valor por
+  defecto sin violar el NOT NULL.
+- **Schemas (`app/schemas/`):** `UsuarioRead` expone `saldo_monedero`;
+  `EstrategiaRead` expone `activa`. Se corrigió `EstrategiaCreate`
+  eliminando los campos `id`, `fecha_creacion`, `fecha_ult_actualizacion`
+  y `activa`, que no deben ser proporcionados por el cliente.
+- **Servicio `app/services/estrategia_service.py`** (nuevo). Cinco
+  funciones síncronas, HTTP-agnósticas: `crear_estrategia`,
+  `listar_estrategias`, `obtener_estrategia_por_id`,
+  `actualizar_estrategia`, `dar_de_baja_estrategia`. Comunica errores
+  mediante `None` (no encontrado) y `ValueError` (conflictos de
+  unicidad).
+- **Router `app/routers/estrategias.py`** (nuevo). Cinco endpoints:
+  - `POST /api/v1/estrategias` — admin — crea estrategia (201).
+  - `GET /api/v1/estrategias` — público — lista solo estrategias activas.
+  - `GET /api/v1/estrategias/{id}` — público — detalle solo si está activa.
+  - `PATCH /api/v1/estrategias/{id}` — admin — actualización parcial.
+  - `DELETE /api/v1/estrategias/{id}` — admin — soft delete con cascada.
+  Los endpoints traducen `None → 404` y `ValueError → 409`.
+- **`app/main.py`:** registro del nuevo router bajo el prefijo
+  `/api/v1`.
+
+### Pruebas ejecutadas (Swagger)
+1. POST con body válido → 201 Created. La estrategia aparece con
+   `activa: true` y `id` asignado por la secuencia de la BBDD.
+2. GET del catálogo público (sin token) → 200 con la estrategia
+   listada.
+3. GET de detalle por id (sin token) → 200 con todos los campos.
+4. POST con nombre duplicado → 409 Conflict con mensaje descriptivo.
+5. PATCH modificando un único campo → 200 OK con el campo actualizado
+   y el resto intactos.
+6. DELETE con admin → 200 OK con la estrategia mostrando
+   `activa: false`.
+7. GET tras DELETE → catálogo vacío + 404 al consultar por id.
+8. Verificación en BBDD: `SELECT id, nombre, activa FROM estrategia;`
+   confirma que la fila se conserva con `activa = false`.
+
+### Incidencias y resoluciones
+- **Migración percibida como incompleta inicialmente.** La primera
+  generación con `--autogenerate` solo detectó `monto_invertido` para
+  `contratacion`. Investigación: los campos `estado`, `fecha_cancelacion`
+  y el enum `EstadoContratacion` ya existían en el modelo desde el
+  lunes; el comportamiento de Alembic era correcto.
+- **Error 403 al probar POST.** Causa: usuario de prueba con rol
+  `user`. Resolución: promoción manual mediante
+  `UPDATE usuario SET rol = 'admin' WHERE correo = 'admin@test.com'`.
+  Decisión consciente: el endpoint de registro no permite asignarse
+  rol admin (correcto por seguridad); el primer admin se promueve en
+  BBDD o por seed.
+- **Esquema `EstrategiaCreate` con campos no controlados por el
+  cliente.** Detectado al revisar el Example Value en Swagger.
+  Corregido eliminando `id`, `fecha_creacion`, `fecha_ult_actualizacion`
+  y `activa` del schema.
+
+### Cambios pendientes en `T2_Analisis_y_Diseno.docx`
+Bloque a realizar antes del cierre de la Tarea 3 (planificado para
+el viernes/sábado):
+- 4-5 RFs nuevos sobre el monedero (saldo inicial al registrarse,
+  consulta del saldo, validación de saldo suficiente al contratar,
+  devolución al cancelar contratación, devolución al dar de baja
+  una estrategia).
+- 1 RF nuevo sobre soft delete de estrategias con cascada.
+- Modificación del RF de contratación existente para incluir la
+  precondición de saldo.
+- Atributos nuevos en el diagrama ER: `usuario.saldo_monedero`,
+  `estrategia.activa`, `contratacion.monto_invertido`,
+  `contratacion.estado`, `contratacion.fecha_cancelacion`.
+- 1-2 CUs nuevos (consulta del saldo, baja de estrategia con cascada).
+- Regeneración de la matriz de trazabilidad RF→CU.
+
+### Trabajo futuro identificado (para conclusiones / mejoras)
+- El método `dar_de_baja_estrategia` presenta patrón N+1 al cargar
+  el usuario propietario de cada contratación. Optimizable mediante
+  `selectinload` o `UPDATE` masivo si la operación se ejecuta sobre
+  estrategias con muchas suscripciones.
+- El endpoint DELETE podría devolver un resumen de la cascada
+  (nº de contrataciones canceladas, monto total devuelto) para
+  mejorar el feedback al admin.
+- Se podría añadir un endpoint de reactivación de estrategias
+  (`PATCH /{id}/reactivar`) que ponga `activa = True`, completando
+  el ciclo de vida del borrado lógico.
+
+### Capturas
+T3_29 a T3_41 en `docs/evidencias/T3/`.
+
+### Próximo día (jueves 14/05)
+Bloque 3.3 catálogo + contrataciones: endpoints públicos de catálogo
+ya hechos, falta implementar `POST /contrataciones` (contratar) y
+`PATCH /contrataciones/{id}/cancelar` (cancelar por usuario).
+Extracción de la lógica de cancelación a `contratacion_service`.

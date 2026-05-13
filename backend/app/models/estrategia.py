@@ -5,7 +5,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import CheckConstraint, Date, DateTime, Enum, Numeric, String, Text, func
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -59,6 +59,8 @@ class Estrategia(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+    # Soft delete: False oculta la estrategia sin borrar la fila ni sus históricos.
+    activa: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # ---------------------------------------------------------------------------
     # BLOQUE 2: Métricas resumen (Tabla 3.29)
