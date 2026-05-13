@@ -1,15 +1,13 @@
 """Lógica de negocio para operaciones CRUD sobre la entidad Estrategia."""
 
-from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.contratacion import Contratacion, EstadoContratacion
 from app.models.estrategia import Estrategia
-from app.models.usuario import Usuario
 from app.schemas.estrategia import EstrategiaCreate, EstrategiaUpdate
+from app.services.contratacion_service import cancelar_contrataciones_de_estrategia
 
 
 def crear_estrategia(db: Session, datos: EstrategiaCreate) -> Estrategia:
@@ -105,23 +103,7 @@ def dar_de_baja_estrategia(db: Session, id_estrategia: int) -> Optional[Estrateg
     if not estrategia.activa:
         return estrategia
 
-    contrataciones_activas = list(
-        db.scalars(
-            select(Contratacion).where(
-                Contratacion.id_estrategia == id_estrategia,
-                Contratacion.estado == EstadoContratacion.ACTIVA,
-            )
-        ).all()
-    )
-
-    ahora = datetime.now(timezone.utc)
-
-    for contratacion in contrataciones_activas:
-        contratacion.estado = EstadoContratacion.CANCELADA
-        contratacion.fecha_cancelacion = ahora
-        usuario: Usuario = contratacion.usuario
-        usuario.saldo_monedero += contratacion.monto_invertido
-
+    cancelar_contrataciones_de_estrategia(db, estrategia.id)
     estrategia.activa = False
 
     db.commit()

@@ -446,3 +446,112 @@ Bloque 3.3 catálogo + contrataciones: endpoints públicos de catálogo
 ya hechos, falta implementar `POST /contrataciones` (contratar) y
 `PATCH /contrataciones/{id}/cancelar` (cancelar por usuario).
 Extracción de la lógica de cancelación a `contratacion_service`.
+
+
+## Jueves 14/05/2026 — Bloque 3.3 (contrataciones)
+
+### Objetivo del día
+Cerrar el flujo del usuario final sobre las estrategias: contratar, listar lo
+contratado y cancelar. Las dos operaciones que mueven dinero (contratar y
+cancelar) tienen que ser atómicas, porque tocan a la vez la tabla
+`contratacion` y el `saldo_monedero` del usuario.
+
+### Trabajo realizado
+
+**Schema de Pydantic.** Actualizado `app/schemas/contratacion.py`. Ahora
+`ContratacionRead` expone los tres campos que se añadieron en la migración
+`bc3f4b90342a`: `monto_invertido`, `estado` y `fecha_cancelacion`.
+`ContratacionCreate` solo acepta `id_estrategia`; el `id_usuario` lo pone el
+router desde el JWT y el `monto_invertido` lo calcula el servicio leyendo
+`precio_subscripcion` de la estrategia.
+
+**Servicio de contrataciones.** Creado `app/services/contratacion_service.py`
+con cuatro funciones:
+
+- `contratar_estrategia(db, id_usuario, datos)`: valida que la estrategia
+  exista y esté activa, que el usuario no tenga ya una contratación ACTIVA
+  sobre esa estrategia y que el saldo cubra el `precio_subscripcion`. Si
+  todo va bien descuenta el saldo y crea la fila de contratación dentro
+  de la misma transacción.
+- `listar_contrataciones_usuario(db, id_usuario)`: devuelve activas y
+  canceladas ordenadas por `fecha_contratacion` descendente.
+- `cancelar_contratacion(db, id_contratacion, id_usuario)`: cancela la
+  contratación si pertenece al usuario y está ACTIVA, devolviendo el
+  `monto_invertido` al saldo.
+- `_aplicar_cancelacion(db, contratacion)`: helper privado que aplica el
+  cambio de estado, rellena `fecha_cancelacion` y devuelve el monto al
+  saldo del usuario, sin hacer commit. Se reutiliza desde dos sitios.
+
+Sobre el usuario uso `with_for_update()` para bloquear la fila durante el
+descuento o devolución del saldo. En un entorno monousuario no es crítico,
+pero evita condiciones de carrera si en algún momento hay peticiones
+simultáneas.
+
+**Refactor de `estrategia_service.dar_de_baja_estrategia`.** Saqué de ahí la
+lógica de cancelación en cascada que había metido provisionalmente ayer.
+Ahora la función delega en una nueva función pública de
+`contratacion_service` llamada `cancelar_contrataciones_de_estrategia`,
+que itera sobre las contrataciones ACTIVAS de una estrategia y llama a
+`_aplicar_cancelacion` por cada una. El commit sigue en
+`dar_de_baja_estrategia`, así que toda la cascada se cierra en una sola
+transacción. `estrategia_service` ya no importa ni `Contratacion` ni
+`EstadoContratacion`, queda limpio.
+
+**Router HTTP.** Creado `app/routers/contrataciones.py` con tres endpoints,
+todos bajo autenticación con `get_current_user`:
+
+- `POST /api/v1/contrataciones` — devuelve 201 con la nueva contratación.
+  Traduce `None` → 404 y los dos `ValueError` del servicio
+  (`contratacion_activa_existente`, `saldo_insuficiente`) → 409 con mensajes
+  legibles.
+- `GET /api/v1/contrataciones/mis-contrataciones` — devuelve la lista del
+  usuario autenticado.
+- `PATCH /api/v1/contrataciones/{id_contratacion}/cancelar` — devuelve 200
+  con la contratación actualizada. Traduce `None` → 404 (incluido el caso
+  de que la contratación sea de otro usuario, para no filtrar existencia)
+  y `ValueError("contratacion_ya_cancelada")` → 409.
+
+Registrado en `app/main.py` con prefijo `/api/v1` y tag `contrataciones`.
+
+### Decisiones de diseño
+
+- **Sin doble contratación simultánea.** Si el usuario ya tiene una
+  contratación ACTIVA sobre una estrategia, el segundo POST devuelve 409.
+  Sí puede volver a contratar tras cancelar.
+- **404 también cuando la contratación es de otro.** El servicio devuelve
+  `None` tanto si la contratación no existe como si existe pero pertenece
+  a otro usuario. Esto evita filtrar información sobre IDs ajenos. El
+  router traduce ambos casos a 404.
+- **Servicio HTTP-agnóstico.** Igual que en estrategias, el servicio
+  devuelve `None` para no encontrado y lanza `ValueError` con códigos
+  cortos para conflictos. El router es el único que conoce HTTP.
+
+### Pruebas realizadas (Swagger)
+
+Ejecutado el flujo completo con un usuario no-admin sobre una estrategia
+activa creada al inicio del día:
+
+1. `GET /users/me` → saldo inicial 10000.00.
+2. `POST /contrataciones` → 201, contratación creada en estado ACTIVA.
+3. `GET /users/me` → saldo descontado en el `precio_subscripcion`.
+4. `POST /contrataciones` repetido → 409 "Ya tienes una contratación activa
+   sobre esta estrategia".
+5. `GET /contrataciones/mis-contrataciones` → la contratación aparece en
+   estado ACTIVA.
+6. `PATCH /contrataciones/{id}/cancelar` → 200, estado CANCELADA y
+   `fecha_cancelacion` rellena.
+7. `GET /users/me` → saldo restaurado a 10000.00.
+8. `PATCH /contrataciones/{id}/cancelar` repetido → 409 "Esta contratación
+   ya está cancelada".
+9. `POST /contrataciones` con la misma estrategia tras cancelar → 201, se
+   permite recontratar.
+
+Capturas guardadas en `docs/evidencias/T3/` de `T3_42_saldo_inicial.png` a
+`T3_50_recontratar_ok.png`.
+
+### Pendientes para mañana
+- Bloque 3.3 (métricas y series): endpoint del dashboard (KPIs) y endpoint
+  de series temporales con TimescaleDB.
+
+### Commit
+`T3: bloque 3.3 - CRUD de contrataciones con validacion de saldo y cascada`
