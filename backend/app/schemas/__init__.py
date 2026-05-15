@@ -11,11 +11,8 @@ from app.schemas.estrategia import (
     EstrategiaRead,
     EstrategiaUpdate,
 )
-from app.schemas.resultado_estrategia import (
-    ResultadoEstrategiaBase,
-    ResultadoEstrategiaCreate,
-    ResultadoEstrategiaRead,
-)
+from app.schemas.dashboard import DashboardKPIs
+from app.schemas.resultado_estrategia import ResultadoEstrategiaRead
 from app.schemas.usuario import (
     UsuarioBase,
     UsuarioCreate,
@@ -35,9 +32,9 @@ __all__ = [
     "EstrategiaUpdate",
     "EstrategiaRead",
     # ResultadoEstrategia
-    "ResultadoEstrategiaBase",
-    "ResultadoEstrategiaCreate",
     "ResultadoEstrategiaRead",
+    # Dashboard
+    "DashboardKPIs",
     # Contratacion
     "ContratacionBase",
     "ContratacionCreate",

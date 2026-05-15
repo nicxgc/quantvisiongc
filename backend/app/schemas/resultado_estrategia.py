@@ -1,4 +1,10 @@
-"""Schemas Pydantic v2 para la entidad ResultadoEstrategia."""
+"""Schemas Pydantic v2 para la entidad ResultadoEstrategia.
+
+A diferencia de otras entidades, ResultadoEstrategia no se crea ni se
+actualiza a través de la API REST: las filas las inserta el script de
+seed (y en el futuro un módulo de ingesta de datos). Por eso solo se
+define el schema Read.
+"""
 
 from datetime import date
 from decimal import Decimal
@@ -7,41 +13,35 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class ResultadoEstrategiaBase(BaseModel):
-    """Campos de un resultado diario de estrategia. Base para Create y Read."""
+class ResultadoEstrategiaRead(BaseModel):
+    """Una observación diaria de los resultados de una estrategia.
+
+    Corresponde a una fila de la tabla resultado_estrategia (Tabla 3.31).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
 
     id_estrategia: int = Field(
         ...,
-        description="ID de la estrategia a la que pertenece este resultado.",
+        description="Identificador de la estrategia a la que pertenece esta observación.",
     )
     fecha: date = Field(
         ...,
-        description="Fecha del punto de datos (un registro por día por estrategia).",
+        description="Fecha de la observación.",
     )
     equity: Decimal = Field(
         ...,
-        description="Valor del equity de la estrategia en esta fecha.",
-    )
-    drawdown: Decimal = Field(
-        ...,
-        le=0,
-        description="Caída acumulada desde el máximo previo. Siempre <= 0.",
+        description="Nivel acumulado del capital en esa fecha, partiendo de 10.000 €.",
     )
     retorno: Decimal = Field(
         ...,
-        description="Retorno diario de la estrategia.",
+        description="Retorno simple del día, calculado respecto al equity del día anterior.",
+    )
+    drawdown: Decimal = Field(
+        ...,
+        description="Caída desde el máximo histórico alcanzado hasta esa fecha. Valor en [-1, 0].",
     )
     sharpe_ratio: Optional[Decimal] = Field(
         default=None,
-        description="Sharpe Rolling calculado sobre ventana histórica. Null hasta acumular datos suficientes.",
+        description="Sharpe ratio rolling anualizado sobre ventana de 30 días. NULL durante el periodo de calentamiento.",
     )
-
-
-class ResultadoEstrategiaCreate(ResultadoEstrategiaBase):
-    """Payload de ingesta de un resultado diario. Idéntico al Base; se separa para claridad semántica."""
-
-
-class ResultadoEstrategiaRead(ResultadoEstrategiaBase):
-    """Representación de un resultado diario leído desde la base de datos."""
-
-    model_config = ConfigDict(from_attributes=True)

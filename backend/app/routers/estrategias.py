@@ -1,14 +1,17 @@
 """Router HTTP para el CRUD de estrategias."""
 
-from typing import Annotated
+from datetime import date
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_admin
 from app.schemas.estrategia import EstrategiaCreate, EstrategiaRead, EstrategiaUpdate
+from app.schemas.resultado_estrategia import ResultadoEstrategiaRead
 from app.services import estrategia_service
+from app.services.metricas_service import obtener_serie_estrategia
 
 router = APIRouter(prefix="/estrategias", tags=["Estrategias"])
 
@@ -104,3 +107,29 @@ def dar_de_baja(
             detail="Estrategia no encontrada.",
         )
     return estrategia
+
+
+@router.get(
+    "/{id_estrategia}/resultados",
+    response_model=list[ResultadoEstrategiaRead],
+    summary="Serie temporal de resultados de una estrategia",
+    description=(
+        "Devuelve la serie diaria de equity, retorno, drawdown y "
+        "Sharpe rolling de una estrategia. Endpoint público. "
+        "Permite filtrar por rango de fechas con los query params "
+        "`desde` y `hasta` (ambos inclusivos, formato YYYY-MM-DD)."
+    ),
+)
+def listar_resultados_estrategia(
+    id_estrategia: int,
+    db: Annotated[Session, Depends(get_db)],
+    desde: Optional[date] = Query(default=None, description="Fecha mínima (inclusiva)."),
+    hasta: Optional[date] = Query(default=None, description="Fecha máxima (inclusiva)."),
+) -> list[ResultadoEstrategiaRead]:
+    serie = obtener_serie_estrategia(db, id_estrategia, desde=desde, hasta=hasta)
+    if serie is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Estrategia no encontrada.",
+        )
+    return serie

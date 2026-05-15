@@ -555,3 +555,53 @@ Capturas guardadas en `docs/evidencias/T3/` de `T3_42_saldo_inicial.png` a
 
 ### Commit
 `T3: bloque 3.3 - CRUD de contrataciones con validacion de saldo y cascada`
+
+
+## Viernes 15/05/2026 — Bloque 3.3 final: métricas y series temporales
+
+Hoy he cerrado el último bloque del desarrollo del backend para esta semana. Cinco subtareas: migración a hypertable, seed de datos, schemas, servicio de métricas y router con dos nuevos endpoints.
+
+### Trabajo realizado
+
+**Subtarea 1 — Hypertable de TimescaleDB.** He generado la migración `2c4820ed3953` que convierte `resultado_estrategia` en hypertable con `chunk_time_interval` de 1 mes. He decidido dejar el `downgrade` como `NotImplementedError` porque TimescaleDB no expone una operación limpia para desconvertir una hypertable, y reconstruir la tabla manualmente daría una falsa sensación de reversibilidad.
+
+**Subtarea 2 — Seed de datos simulados.** He creado `backend/scripts/seed_resultados.py`. Genera 267 días hábiles de datos para las 3 primeras estrategias activas usando un proceso de Movimiento Browniano Geométrico (GBM) con tres perfiles diferenciados: agresiva (drift 18%, vol 25%), equilibrada (drift 10%, vol 15%) y conservadora (drift 5%, vol 8%). El script es idempotente —borra las filas existentes antes de insertar— y usa semilla fija (42) para que los datos sean reproducibles. Para tener las tres estrategias he creado dos nuevas vía POST en Swagger: "Multi-Activo Equilibrado" (id=4) y "Renta Fija Defensiva" (id=5). He añadido `numpy>=1.26` al `requirements.txt`.
+
+Las volatilidades realizadas (0.23, 0.16, 0.08) cuadran muy bien con los targets teóricos. Los retornos realizados quedan algo lejos del drift teórico debido a las propiedades estadísticas del GBM con horizontes cortos: con vol=0.25, el error estándar del retorno anualizado es del mismo orden de magnitud que el propio drift, por lo que es estadísticamente esperable que en un solo año los ránkings entre perfiles se inviertan. Mantengo la semilla 42 y documento este matiz como reflejo fiel del comportamiento estocástico que la plataforma debe modelar.
+
+**Subtarea 3 — Schemas.** He creado `ResultadoEstrategiaRead` en `app/schemas/resultado_estrategia.py` y `DashboardKPIs` en `app/schemas/dashboard.py`. No he creado los schemas Create/Update de `ResultadoEstrategia` porque las filas las genera el seed —y en el futuro lo hará un módulo de ingesta de datos—, no la API REST. Esto rompe ligeramente el patrón Base/Create/Update/Read del resto del proyecto pero está justificado por el flujo de datos: el usuario no crea resultados desde el frontend.
+
+**Subtarea 4 — Servicio de métricas.** He creado `app/services/metricas_service.py` con dos funciones. `obtener_serie_estrategia` devuelve la serie ordenada por fecha ascendente, acepta filtros opcionales `desde` y `hasta`, y devuelve `None` si la estrategia no existe (siguiendo la convención del proyecto: None → 404 en el router). `obtener_kpis_dashboard` agrega los datos del usuario escalando el `monto_invertido` de cada contratación activa por el factor `equity_final / equity_inicial`, donde `equity_inicial` se toma de la fecha de contratación. La función maneja correctamente el caso del usuario sin contrataciones (devuelve ceros) y la división por cero en la rentabilidad.
+
+**Subtarea 5 — Endpoints.** He añadido `GET /api/v1/estrategias/{id_estrategia}/resultados` al router existente de estrategias (público, con query params opcionales `desde` y `hasta`) y he creado un router nuevo `app/routers/dashboard.py` con `GET /api/v1/dashboard/kpis` (autenticado, KPIs del propio usuario). Ambos endpoints quedan registrados en `main.py`.
+
+### Decisiones técnicas
+
+- Chunks mensuales en la hypertable en lugar de los 7 días por defecto: con datos diarios y horizontes de varios años, los chunks semanales generarían demasiados particiones pequeñas.
+- Downgrade explícito como `NotImplementedError` con mensaje claro en vez de un downgrade incorrecto o silencioso.
+- Semilla fija 42 documentada: garantiza reproducibilidad para cualquier reviewer.
+- Endpoint de resultados como sub-recurso de estrategias (`/estrategias/{id}/resultados`) en lugar de un endpoint independiente: refleja mejor que la serie temporal pertenece semánticamente a la estrategia.
+- KPIs calculados al vuelo en cada petición en vez de cacheados: para el alcance del TFG la consulta es ligera (≤3 estrategias × 2 queries por usuario), y evita problemas de consistencia.
+
+### Verificaciones realizadas
+
+Las cinco subtareas se han validado paso a paso antes de avanzar a la siguiente:
+
+- Migración aplicada correctamente, hypertable con 14 chunks tras la inserción del seed.
+- 267 filas por cada una de las 3 estrategias, integridad verificada: sin NULLs en campos no nullable, drawdowns acotados a [-1, 0], `sharpe_ratio` NULL solo en los primeros 29 días de cada serie.
+- Volatilidades realizadas alineadas con los targets de cada perfil.
+- Imports de schemas y servicio sin errores; validación Pydantic correcta desde dict y desde objeto ORM (`from_attributes=True`).
+- Llamadas directas al servicio: 267 filas para la serie completa, 64 con filtros enero–marzo, `None` para estrategia inexistente.
+- KPIs cuadran al céntimo: 9950.01 € de saldo + 49.99 € invertidos = 10000 € (consistente con el monedero ficticio inicial).
+- Los nuevos endpoints verificados en Swagger: 200 para el caso feliz, 404 para estrategia inexistente, 401 sin autenticación, y 200 con datos correctos para el usuario con contrataciones y para el usuario sin contrataciones.
+
+### Estado al cierre
+
+- Migraciones aplicadas: `2c4820ed3953` (head).
+- 18 endpoints en total (2 nuevos hoy).
+- 3 estrategias activas con 801 filas de resultados en total.
+- Backend listo para la prueba end-to-end completa de mañana.
+
+### Mañana
+
+Bloque 3.6: manejador global de excepciones, repaso de validaciones Pydantic y prueba end-to-end completa en Swagger de todos los endpoints. Cierre de la Tarea 3.
