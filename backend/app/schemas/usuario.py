@@ -4,13 +4,15 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.models.usuario import RolUsuario
 
 
 class UsuarioBase(BaseModel):
     """Campos compartidos presentes en todas las operaciones de Usuario."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
 
     nombre_completo: str = Field(
         ...,
@@ -34,9 +36,21 @@ class UsuarioCreate(UsuarioBase):
         description="Contraseña en texto plano. Mínimo 8 caracteres.",
     )
 
+    @field_validator("password")
+    @classmethod
+    def password_debe_tener_letra_y_digito(cls, v: str) -> str:
+        """Exige al menos una letra y un dígito en la contraseña."""
+        if not any(c.isalpha() for c in v):
+            raise ValueError("La contraseña debe contener al menos una letra.")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("La contraseña debe contener al menos un número.")
+        return v
+
 
 class UsuarioUpdate(BaseModel):
     """Payload para actualizar parcialmente un usuario (PATCH). Solo nombre_completo es modificable por esta vía."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
 
     nombre_completo: Optional[str] = Field(
         default=None,

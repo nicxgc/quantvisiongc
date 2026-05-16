@@ -22,10 +22,7 @@ def register(
     db: Annotated[Session, Depends(get_db)],
 ) -> Usuario:
     """Registra un nuevo usuario con rol 'user'. El correo debe ser único."""
-    try:
-        return create_usuario(db, data)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return create_usuario(db, data)
 
 
 @router.post("/auth/login")

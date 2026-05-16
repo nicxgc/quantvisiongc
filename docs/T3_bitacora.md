@@ -605,3 +605,55 @@ Las cinco subtareas se han validado paso a paso antes de avanzar a la siguiente:
 ### Mañana
 
 Bloque 3.6: manejador global de excepciones, repaso de validaciones Pydantic y prueba end-to-end completa en Swagger de todos los endpoints. Cierre de la Tarea 3.
+
+
+## Sabado 16/05/2026 — Bloque 3.6: validación de datos y gestión de errores. Cierre de la Tarea 3.
+
+Como tenía tiempo de tarde, he decidido adelantar el Bloque 3.6 que tenía planeado para el sábado. Tres subtareas: manejador global de excepciones, repaso de validaciones Pydantic y prueba end-to-end en Swagger. Todo cerrado y, con ello, la Tarea 3 completa.
+
+### Trabajo realizado
+
+**Subtarea 1 — Manejador global de excepciones.** He creado `app/core/error_handlers.py` con dos handlers: `value_error_handler` que convierte `ValueError` a `409 Conflict` y `generic_exception_handler` que captura cualquier excepción no manejada, registra los detalles en el log del servidor y devuelve un `500 Internal Server Error` con mensaje genérico al cliente. Registrados en `main.py` con `add_exception_handler`. Además, he refactorizado los routers `auth.py`, `estrategias.py` y `contrataciones.py` para eliminar los `try/except ValueError → HTTPException(409)` repetidos endpoint a endpoint: ahora los servicios siguen lanzando `ValueError`, los routers delegan, y el handler global hace la traducción a HTTP de forma centralizada.
+
+**Subtarea 2 — Validaciones Pydantic.** Tras auditar los cinco schemas, he aplicado tres mejoras:
+- En `usuario.py`: `str_strip_whitespace` en `UsuarioBase` y `UsuarioUpdate`; validator custom en `UsuarioCreate` que exige al menos una letra y un dígito en la contraseña, además del `min_length=8` que ya tenía.
+- En `estrategia.py`: `str_strip_whitespace` en `EstrategiaBase` y `EstrategiaUpdate`; validator que rechaza `fecha_inicio` futuras.
+- En `contratacion.py`: he reescrito el archivo completo para añadir `Field(...)` con descripciones a todos los campos (mejora la documentación OpenAPI), `gt=0` en `id_estrategia` y `str_strip_whitespace` en `ContratacionBase`.
+
+**Subtarea 3 — Prueba end-to-end en Swagger.** He recorrido la matriz completa de los 18 endpoints validando casos felices, autenticación, autorización por rol, y los códigos de error relevantes (401, 403, 404, 409, 422 y 500). Todas las respuestas cuadran con lo esperado. He generado 12 capturas estratégicas (57 a 68) que documentan visualmente cada código HTTP en distintos endpoints, dando una matriz de evidencia completa para la memoria.
+
+### Hotfix descubierto durante el testing
+
+Mientras probaba el `PATCH /api/v1/estrategias/{id}` para cambiar el nombre de una estrategia, FastAPI devolvía `500` con un `ResponseValidationError`. La causa: había colocado el validator de `fecha_inicio` en `EstrategiaBase`, que es la clase padre de `EstrategiaRead`. Cuando FastAPI serializa la respuesta usando `response_model=EstrategiaRead`, ejecuta los validators heredados, y como en BBDD había una estrategia con `fecha_inicio` futura (creada antes de añadir el validator), la serialización fallaba.
+
+He resuelto el problema moviendo el validator a `EstrategiaCreate` (campo obligatorio) y a `EstrategiaUpdate` (campo opcional, con check de None). Después he limpiado en BBDD las estrategias con fecha futura con un `UPDATE estrategia SET fecha_inicio = '2024-01-01' WHERE fecha_inicio > CURRENT_DATE`.
+
+La lección que me llevo es importante para el diseño: **los validators que comprueban reglas de negocio sobre entradas del cliente deben vivir en los schemas Create/Update exclusivamente**, no en Base ni Read, porque Read procesa datos históricos que pueden no cumplir las reglas actuales del sistema. Documento esto aquí porque es exactamente el tipo de decisión arquitectónica que el tribunal puede preguntar.
+
+### Decisiones técnicas
+
+- Handler global de `Exception` con `logger.exception` y respuesta genérica al cliente para no exponer trazas internas (alineado con OWASP A09 sobre fugas de información en errores).
+- Validaciones de contraseña moderadas (letra + dígito + min 8), alineadas con la guía NIST SP 800-63B que prioriza la longitud y la simplicidad frente a reglas de complejidad onerosas.
+- Validator de `fecha_inicio` solo en `Create` y `Update` tras el hotfix.
+- `str_strip_whitespace` aplicado en los schemas Base y Update con campos string, para garantizar limpieza consistente.
+
+### Verificaciones realizadas
+
+- 9 verificaciones específicas tras la Subtarea 1 (handler global), incluyendo regresiones de `None → 404` y de `422` de Pydantic.
+- 9 verificaciones tras la Subtarea 2 (nuevas validaciones).
+- Matriz completa de los 18 endpoints en Swagger.
+- 4 verificaciones tras el hotfix (GET y PATCH funcionan; validator sigue rechazando creación con fecha futura; validator de Update también funciona).
+
+### Estado al cierre
+
+- 18 endpoints funcionando, documentados y testeados end-to-end.
+- Manejador global de excepciones operativo en toda la app.
+- Validaciones Pydantic robustecidas en los schemas de entrada.
+- Backend completo, con cobertura manual de extremo a extremo.
+- Migraciones aplicadas: `2c4820ed3953` (head).
+- 3 estrategias activas con 801 filas de resultados.
+- **Tarea 3 cerrada al completo** (70 horas previstas en el plan, consumidas).
+
+### Próximos pasos
+
+Empezar la Tarea 4 (frontend con React + Vite + Ant Design + Recharts). Como parto de cero en React, los primeros días los dedicaré a fundamentos del lenguaje antes de tocar el proyecto.

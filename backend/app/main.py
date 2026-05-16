@@ -8,14 +8,18 @@ e incluye los routers de cada módulo funcional.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.error_handlers import generic_exception_handler, value_error_handler
 from app.routers import auth, contrataciones, dashboard, estrategias, health
 
 app = FastAPI(
     title="QuantVisionGC API",
     version="0.1.0",
     description="API REST del TFG QuantVisionGC",
-    
+
 )
+
+app.add_exception_handler(ValueError, value_error_handler)
+app.add_exception_handler(Exception, generic_exception_handler)
 
 # CORS: solo se permite el origen del frontend en desarrollo local.
 # En producción esta lista debe revisarse y restringirse al dominio real.

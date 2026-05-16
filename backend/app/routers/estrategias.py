@@ -27,10 +27,7 @@ def crear(
     datos: EstrategiaCreate,
     db: Annotated[Session, Depends(get_db)],
 ) -> EstrategiaRead:
-    try:
-        return estrategia_service.crear_estrategia(db, datos)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    return estrategia_service.crear_estrategia(db, datos)
 
 
 @router.get(
@@ -75,10 +72,7 @@ def actualizar(
     datos: EstrategiaUpdate,
     db: Annotated[Session, Depends(get_db)],
 ) -> EstrategiaRead:
-    try:
-        estrategia = estrategia_service.actualizar_estrategia(db, id_estrategia, datos)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    estrategia = estrategia_service.actualizar_estrategia(db, id_estrategia, datos)
     if estrategia is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

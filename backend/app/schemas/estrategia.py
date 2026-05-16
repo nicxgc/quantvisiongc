@@ -4,13 +4,15 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.estrategia import EstadoEstrategia
 
 
 class EstrategiaBase(BaseModel):
     """Campos descriptivos de la estrategia (Bloque 1 / Tabla 3.28). Base para Create, Update y Read."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
 
     nombre: str = Field(
         ...,
@@ -64,6 +66,16 @@ class EstrategiaCreate(EstrategiaBase):
         description="Estado inicial de la estrategia. Por defecto 'activa'.",
     )
 
+    @field_validator("fecha_inicio")
+    @classmethod
+    def fecha_inicio_no_futuro(cls, v: date) -> date:
+        """fecha_inicio representa el primer dato histórico disponible
+        de la estrategia, por lo que no tiene sentido que sea futura.
+        """
+        if v > date.today():
+            raise ValueError("La fecha de inicio no puede estar en el futuro.")
+        return v
+
 
 class EstrategiaUpdate(BaseModel):
     """Payload para actualizar parcialmente una estrategia (PATCH).
@@ -71,6 +83,8 @@ class EstrategiaUpdate(BaseModel):
     Las métricas (Bloque 2) y los escenarios (Bloque 3) no se editan
     manualmente; los rellena el módulo de ingesta de datos.
     """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
 
     nombre: Optional[str] = Field(default=None, min_length=3, max_length=100, description="Nombre de la estrategia.")
     descripcion: Optional[str] = Field(default=None, max_length=2000, description="Descripción de la estrategia.")
@@ -81,6 +95,14 @@ class EstrategiaUpdate(BaseModel):
     comision_ganancias: Optional[Decimal] = Field(default=None, ge=0, le=100, description="Comisión sobre ganancias (%).")
     fecha_inicio: Optional[date] = Field(default=None, description="Fecha de inicio de la estrategia.")
     estado: Optional[EstadoEstrategia] = Field(default=None, description="Estado de la estrategia.")
+
+    @field_validator("fecha_inicio")
+    @classmethod
+    def fecha_inicio_no_futuro(cls, v: Optional[date]) -> Optional[date]:
+        """Si se actualiza fecha_inicio, no puede quedar en el futuro."""
+        if v is not None and v > date.today():
+            raise ValueError("La fecha de inicio no puede estar en el futuro.")
+        return v
 
 
 class EstrategiaRead(EstrategiaBase):

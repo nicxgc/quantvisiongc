@@ -37,21 +37,7 @@ def contratar(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[Usuario, Depends(get_current_user)],
 ) -> ContratacionRead:
-    try:
-        resultado = contratacion_service.contratar_estrategia(db, current_user.id, datos)
-    except ValueError as e:
-        codigo = str(e)
-        if codigo == "contratacion_activa_existente":
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Ya tienes una contratación activa sobre esta estrategia",
-            )
-        if codigo == "saldo_insuficiente":
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Saldo insuficiente para contratar esta estrategia",
-            )
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=codigo)
+    resultado = contratacion_service.contratar_estrategia(db, current_user.id, datos)
     if resultado is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -70,17 +56,9 @@ def cancelar(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[Usuario, Depends(get_current_user)],
 ) -> ContratacionRead:
-    try:
-        resultado = contratacion_service.cancelar_contratacion(
-            db, id_contratacion, current_user.id
-        )
-    except ValueError as e:
-        if str(e) == "contratacion_ya_cancelada":
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Esta contratación ya está cancelada",
-            )
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    resultado = contratacion_service.cancelar_contratacion(
+        db, id_contratacion, current_user.id
+    )
     if resultado is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
