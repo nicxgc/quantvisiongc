@@ -8,7 +8,8 @@
       "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"\\\\dt\")",
       "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"SELECT hypertable_name, num_chunks FROM timescaledb_information.hypertables;\")",
       "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"SELECT id, correo FROM usuario ORDER BY id;\")",
-      "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"SELECT id, id_usuario, id_estrategia, estado FROM contratacion WHERE estado='activa' LIMIT 5;\")"
+      "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"SELECT id, id_usuario, id_estrategia, estado FROM contratacion WHERE estado='activa' LIMIT 5;\")",
+      "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"SELECT id, correo, rol, activa FROM usuario ORDER BY id;\")"
     ]
   }
 }

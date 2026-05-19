@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, Numeric, String, func
+from sqlalchemy import Boolean, DateTime, Enum, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -41,6 +41,8 @@ class Usuario(Base):
         Numeric(12, 2),
         default=Decimal("10000.00"),
     )
+    # Soft delete: False bloquea el acceso sin borrar la fila ni su historial.
+    activa: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Relación 1-N: un usuario puede tener varias contrataciones
     contrataciones: Mapped[list["Contratacion"]] = relationship(

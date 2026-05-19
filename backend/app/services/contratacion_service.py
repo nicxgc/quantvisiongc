@@ -138,6 +138,30 @@ def _aplicar_cancelacion(db: Session, contratacion: Contratacion) -> None:
     contratacion.fecha_cancelacion = datetime.now(timezone.utc)
 
 
+def cancelar_contrataciones_de_usuario(db: Session, id_usuario: int) -> int:
+    """
+    Cancela todas las contrataciones ACTIVAS de un usuario y devuelve
+    el monto_invertido al saldo_monedero del propio usuario.
+
+    No hace commit: el caller (eliminar_usuario) garantiza la atomicidad
+    cerrando la transacción una única vez.
+
+    Returns:
+        Número de contrataciones canceladas (0 si no había ninguna activa).
+    """
+    contrataciones = list(
+        db.execute(
+            select(Contratacion).where(
+                Contratacion.id_usuario == id_usuario,
+                Contratacion.estado == EstadoContratacion.ACTIVA,
+            )
+        ).scalars()
+    )
+    for contratacion in contrataciones:
+        _aplicar_cancelacion(db, contratacion)
+    return len(contrataciones)
+
+
 def cancelar_contrataciones_de_estrategia(db: Session, id_estrategia: int) -> int:
     """
     Cancela todas las contrataciones ACTIVAS de una estrategia dada y

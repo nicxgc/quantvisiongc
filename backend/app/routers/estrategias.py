@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_admin
-from app.schemas.estrategia import EstrategiaCreate, EstrategiaRead, EstrategiaUpdate
+from app.schemas.estrategia import EstrategiaAdminRead, EstrategiaCreate, EstrategiaRead, EstrategiaUpdate
 from app.schemas.resultado_estrategia import ResultadoEstrategiaRead
 from app.services import estrategia_service
 from app.services.metricas_service import obtener_serie_estrategia
@@ -39,6 +39,23 @@ def listar(
     db: Annotated[Session, Depends(get_db)],
 ) -> list[EstrategiaRead]:
     return estrategia_service.listar_estrategias(db, solo_activas=True)
+
+
+@router.get(
+    "/admin",
+    response_model=list[EstrategiaAdminRead],
+    summary="Listado completo de estrategias para administrador (RF-12)",
+    description=(
+        "Devuelve todas las estrategias, incluidas las dadas de baja, "
+        "con el número de contrataciones activas y la fecha del último dato "
+        "histórico disponible en resultado_estrategia."
+    ),
+    dependencies=[Depends(require_admin)],
+)
+def listar_admin(
+    db: Annotated[Session, Depends(get_db)],
+) -> list[EstrategiaAdminRead]:
+    return estrategia_service.listar_estrategias_admin(db)
 
 
 @router.get(

@@ -69,3 +69,10 @@ class UsuarioRead(UsuarioBase):
     rol: RolUsuario = Field(..., description="Rol del usuario en el sistema: 'admin' o 'user'.")
     fecha_registro: datetime = Field(..., description="Fecha y hora de registro con timezone.")
     saldo_monedero: Decimal = Field(..., description="Saldo disponible en el monedero virtual del usuario.")
+    activa: bool = Field(..., description="False indica que la cuenta ha sido eliminada (soft delete).")
+
+
+class LogoutResponse(BaseModel):
+    """Respuesta del endpoint de cierre de sesión (RF-04)."""
+
+    message: str = Field(..., description="Confirmación de cierre de sesión.")

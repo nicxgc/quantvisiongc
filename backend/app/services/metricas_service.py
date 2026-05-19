@@ -9,14 +9,67 @@ from datetime import date
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import literal, select, union_all
 from sqlalchemy.orm import Session
 
 from app.models.contratacion import Contratacion, EstadoContratacion
 from app.models.estrategia import Estrategia
 from app.models.resultado_estrategia import ResultadoEstrategia
 from app.models.usuario import Usuario
-from app.schemas.dashboard import DashboardKPIs
+from app.schemas.dashboard import AccionReciente, DashboardKPIs
+
+
+def obtener_actividad_reciente(
+    db: Session,
+    id_usuario: int,
+    limite: int,
+) -> list[AccionReciente]:
+    """Devuelve los últimos `limite` eventos de actividad del usuario (RF-27).
+
+    Usa UNION ALL entre dos SELECT sobre contratacion para tratar cada
+    evento (contratacion / cancelacion) como una fila independiente en el
+    feed, ordenados cronológicamente de más reciente a más antiguo.
+    Devuelve [] si el usuario no tiene actividad.
+    """
+    # Evento "contratacion": una fila por cada contratación creada.
+    select_contrataciones = (
+        select(
+            literal("contratacion").label("tipo"),
+            Contratacion.fecha_contratacion.label("fecha"),
+            Estrategia.nombre.label("nombre_estrategia"),
+            Estrategia.precio_subscripcion.label("monto"),
+        )
+        .join(Estrategia, Estrategia.id == Contratacion.id_estrategia)
+        .where(Contratacion.id_usuario == id_usuario)
+    )
+
+    # Evento "cancelacion": solo las contrataciones que tienen fecha_cancelacion.
+    select_cancelaciones = (
+        select(
+            literal("cancelacion").label("tipo"),
+            Contratacion.fecha_cancelacion.label("fecha"),
+            Estrategia.nombre.label("nombre_estrategia"),
+            Estrategia.precio_subscripcion.label("monto"),
+        )
+        .join(Estrategia, Estrategia.id == Contratacion.id_estrategia)
+        .where(Contratacion.id_usuario == id_usuario)
+        .where(Contratacion.fecha_cancelacion.is_not(None))
+    )
+
+    # UNION ALL → subquery → ordenar por fecha descendente → limitar.
+    unioned = union_all(select_contrataciones, select_cancelaciones).subquery()
+    stmt = select(unioned).order_by(unioned.c.fecha.desc()).limit(limite)
+
+    rows = db.execute(stmt).all()
+    return [
+        AccionReciente(
+            tipo=row.tipo,
+            fecha=row.fecha,
+            nombre_estrategia=row.nombre_estrategia,
+            monto=row.monto,
+        )
+        for row in rows
+    ]
 
 
 def obtener_serie_estrategia(

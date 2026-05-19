@@ -36,6 +36,11 @@ def get_current_user(
     if usuario is None:
         raise credentials_exception
 
+    # Usuarios eliminados (soft delete) tienen activa=False.
+    # Se rechaza con el mismo 401 genérico para no filtrar el estado de la cuenta.
+    if not usuario.activa:
+        raise credentials_exception
+
     return usuario
 
 

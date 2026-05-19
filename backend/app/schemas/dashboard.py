@@ -1,6 +1,8 @@
 """Schemas Pydantic v2 para los DTOs del dashboard de usuario."""
 
+from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -37,4 +39,23 @@ class DashboardKPIs(BaseModel):
     num_estrategias_activas: int = Field(
         ...,
         description="Número de contrataciones del usuario actualmente activas.",
+    )
+
+
+class AccionReciente(BaseModel):
+    """Un evento de actividad del usuario en el dashboard (RF-27).
+
+    Cada contratación produce un evento 'contratacion' y, si se cancela,
+    un evento 'cancelacion' adicional e independiente.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    tipo: Literal["contratacion", "cancelacion"] = Field(
+        ..., description="Tipo de evento: 'contratacion' al contratar, 'cancelacion' al cancelar."
+    )
+    fecha: datetime = Field(..., description="Fecha y hora del evento.")
+    nombre_estrategia: str = Field(..., description="Nombre de la estrategia involucrada.")
+    monto: Decimal = Field(
+        ..., description="Importe en euros (siempre positivo). El tipo indica la dirección del flujo."
     )

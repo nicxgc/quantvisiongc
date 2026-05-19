@@ -132,3 +132,20 @@ class EstrategiaRead(EstrategiaBase):
     mejor_1a: Optional[Decimal] = Field(default=None, description="Mejor retorno en ventana de 1 año.")
     peor_1a: Optional[Decimal] = Field(default=None, description="Peor retorno en ventana de 1 año.")
     activa: bool = Field(..., description="False indica soft delete: la estrategia está desactivada pero sus datos se conservan.")
+
+
+class EstrategiaAdminRead(EstrategiaRead):
+    """Vista de administrador de una estrategia (RF-12).
+
+    Extiende EstrategiaRead con dos campos agregados calculados en consulta.
+    Incluye estrategias inactivas (activa=False).
+    """
+
+    num_contrataciones_activas: int = Field(
+        ...,
+        description="Número de usuarios con contratación activa sobre esta estrategia.",
+    )
+    fecha_ultima_actualizacion: Optional[date] = Field(
+        default=None,
+        description="Fecha del dato más reciente en resultado_estrategia. None si no hay datos cargados.",
+    )
