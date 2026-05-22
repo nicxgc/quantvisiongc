@@ -6,8 +6,10 @@ from sqlalchemy.orm import Session
 
 from app.models.contratacion import Contratacion, EstadoContratacion
 from app.models.estrategia import Estrategia
+from app.models.movimiento_monedero import TipoMovimiento
 from app.models.usuario import Usuario
 from app.schemas.contratacion import ContratacionCreate
+from app.services.monedero_service import registrar_movimiento
 
 
 def contratar_estrategia(
@@ -65,6 +67,9 @@ def contratar_estrategia(
         estado=EstadoContratacion.ACTIVA,
     )
     db.add(nueva)
+    # flush para que PostgreSQL asigne nueva.id antes de usarlo en el movimiento.
+    db.flush()
+    registrar_movimiento(db, usuario, TipoMovimiento.CONTRATACION, precio, nueva.id)
     db.commit()
     db.refresh(nueva)
     return nueva
@@ -136,6 +141,10 @@ def _aplicar_cancelacion(db: Session, contratacion: Contratacion) -> None:
     usuario.saldo_monedero += contratacion.monto_invertido
     contratacion.estado = EstadoContratacion.CANCELADA
     contratacion.fecha_cancelacion = datetime.now(timezone.utc)
+    registrar_movimiento(
+        db, usuario, TipoMovimiento.CANCELACION,
+        contratacion.monto_invertido, contratacion.id,
+    )
 
 
 def cancelar_contrataciones_de_usuario(db: Session, id_usuario: int) -> int:

@@ -7,6 +7,7 @@ metadata de la Base antes de que Alembic genere migraciones con --autogenerate.
 
 from app.models.contratacion import Contratacion, EstadoContratacion
 from app.models.estrategia import Estrategia, EstadoEstrategia
+from app.models.movimiento_monedero import MovimientoMonedero, TipoMovimiento
 from app.models.resultado_estrategia import ResultadoEstrategia
 from app.models.usuario import Usuario, RolUsuario
 
@@ -18,4 +19,6 @@ __all__ = [
     "ResultadoEstrategia",
     "Contratacion",
     "EstadoContratacion",
+    "MovimientoMonedero",
+    "TipoMovimiento",
 ]

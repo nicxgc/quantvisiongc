@@ -48,3 +48,19 @@ class Settings(BaseSettings):
 
 # Instancia singleton; el resto de módulos importan este objeto directamente.
 settings = Settings()
+
+
+# ---------------------------------------------------------------------------
+# Constantes de negocio (NO son variables de entorno, no van dentro de Settings)
+# ---------------------------------------------------------------------------
+from decimal import Decimal  # noqa: E402
+
+# Denominaciones válidas para la recarga del monedero virtual (RF-46).
+CANTIDADES_RECARGA_PERMITIDAS: tuple[Decimal, ...] = (
+    Decimal("50.00"),
+    Decimal("100.00"),
+    Decimal("250.00"),
+    Decimal("500.00"),
+    Decimal("1000.00"),
+    Decimal("5000.00"),
+)

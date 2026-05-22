@@ -12,6 +12,7 @@ from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.contratacion import Contratacion
+    from app.models.movimiento_monedero import MovimientoMonedero
 
 
 class RolUsuario(str, enum.Enum):
@@ -39,7 +40,8 @@ class Usuario(Base):
     )
     saldo_monedero: Mapped[Decimal] = mapped_column(
         Numeric(12, 2),
-        default=Decimal("10000.00"),
+        default=Decimal("0.00"),
+        server_default="0.00",
     )
     # Soft delete: False bloquea el acceso sin borrar la fila ni su historial.
     activa: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -47,5 +49,11 @@ class Usuario(Base):
     # Relación 1-N: un usuario puede tener varias contrataciones
     contrataciones: Mapped[list["Contratacion"]] = relationship(
         "Contratacion",
+        back_populates="usuario",
+    )
+
+    # Relación 1-N: un usuario puede tener varios movimientos de monedero
+    movimientos: Mapped[list["MovimientoMonedero"]] = relationship(
+        "MovimientoMonedero",
         back_populates="usuario",
     )
