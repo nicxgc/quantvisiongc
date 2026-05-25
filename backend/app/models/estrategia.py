@@ -1,4 +1,4 @@
-"""Modelo ORM para la entidad Estrategia. Combina las Tablas 3.28, 3.29 y 3.30 de la memoria."""
+"""Modelo ORM para la entidad Estrategia."""
 
 import enum
 from datetime import date, datetime
@@ -9,9 +9,11 @@ from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, Numeric, 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.models.enums import tipo_estrategia_enum
 
 if TYPE_CHECKING:
     from app.models.contratacion import Contratacion
+    from app.models.metrica_estrategia import MetricaEstrategia
     from app.models.resultado_estrategia import ResultadoEstrategia
 
 
@@ -21,7 +23,7 @@ class EstadoEstrategia(str, enum.Enum):
 
 
 class Estrategia(Base):
-    """Corresponde a las Tablas 3.28, 3.29 y 3.30 de la memoria."""
+    """Tabla principal de estrategias de inversión."""
 
     __tablename__ = "estrategia"
 
@@ -33,7 +35,7 @@ class Estrategia(Base):
     )
 
     # ---------------------------------------------------------------------------
-    # BLOQUE 1: Datos descriptivos (Tabla 3.28)
+    # BLOQUE 1: Datos descriptivos
     # ---------------------------------------------------------------------------
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     nombre: Mapped[str] = mapped_column(String(100), unique=True, index=True)
@@ -63,39 +65,28 @@ class Estrategia(Base):
     activa: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # ---------------------------------------------------------------------------
-    # BLOQUE 2: Métricas resumen (Tabla 3.29)
-    # Estos campos se rellenan tras la primera ingesta de datos. Cuando un admin
-    # crea una estrategia nueva sin datos cargados, todos estos valores son NULL.
+    # BLOQUE 2: Identificación y clasificación (nuevo en T1.1)
     # ---------------------------------------------------------------------------
-    retorno_total: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
-    volatilidad: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
-    max_drawdown: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
-    win_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 4), nullable=True)
-    sortino_ratio: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
-    sharpe_ratio: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
-    num_operaciones: Mapped[Optional[int]] = mapped_column(nullable=True)
+    # Código único legible por humanos (ej. "SP500_OOS_2024").
+    codigo_estrategia: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    # Tipo de estrategia: 'estrategia_activa' o 'benchmark'.
+    tipo: Mapped[str] = mapped_column(tipo_estrategia_enum, nullable=False)
+    # Fecha de cierre de la estrategia; NULL si sigue activa.
+    fecha_fin: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
     # ---------------------------------------------------------------------------
-    # BLOQUE 3: Escenarios históricos (Tabla 3.30)
-    # Estos campos se rellenan tras la primera ingesta de datos. Cuando un admin
-    # crea una estrategia nueva sin datos cargados, todos estos valores son NULL.
+    # Relaciones
     # ---------------------------------------------------------------------------
-    mejor_1m: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
-    peor_1m: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
-    mejor_3m: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
-    peor_3m: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
-    mejor_1a: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
-    peor_1a: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4), nullable=True)
-
-    # Relación 1-N con ResultadoEstrategia: cascade delete para que al borrar
-    # una estrategia se eliminen también todos sus resultados históricos.
     resultados: Mapped[list["ResultadoEstrategia"]] = relationship(
         "ResultadoEstrategia",
         back_populates="estrategia",
         cascade="all, delete-orphan",
     )
-
-    # Relación 1-N con Contratacion
+    metricas: Mapped[list["MetricaEstrategia"]] = relationship(
+        "MetricaEstrategia",
+        back_populates="estrategia",
+        cascade="all, delete-orphan",
+    )
     contrataciones: Mapped[list["Contratacion"]] = relationship(
         "Contratacion",
         back_populates="estrategia",

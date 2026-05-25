@@ -11,7 +11,29 @@
       "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"SELECT id, id_usuario, id_estrategia, estado FROM contratacion WHERE estado='activa' LIMIT 5;\")",
       "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"SELECT id, correo, rol, activa FROM usuario ORDER BY id;\")",
       "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"\\\\d movimiento_monedero\")",
-      "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"SELECT typname FROM pg_type WHERE typname = 'tipo_movimiento';\")"
+      "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"SELECT typname FROM pg_type WHERE typname = 'tipo_movimiento';\")",
+      "PowerShell(docker exec quantvisiongc_db psql -U postgres -d quantvisiongc -c \"\\\\d estrategia\" 2>&1)",
+      "PowerShell(docker exec quantvisiongc_db psql -U quantvision -d quantvisiongc -c \"\\\\du\" 2>&1)",
+      "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"\\\\d resultado_estrategia\" 2>&1)",
+      "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"\\\\d metrica_estrategia\" 2>&1)",
+      "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"SELECT hypertable_name FROM timescaledb_information.hypertables ORDER BY hypertable_name\" 2>&1)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:8001/openapi.json\" -UseBasicParsing -ErrorAction Stop)",
+      "PowerShell(New-Item -ItemType Directory -Force -Path C:\\\\TFG\\\\quantvisiongc\\\\docs\\\\historico)",
+      "PowerShell(Copy-Item C:\\\\TFG\\\\quantvisiongc\\\\backend\\\\scripts\\\\seed_resultados.py C:\\\\TFG\\\\quantvisiongc\\\\docs\\\\historico\\\\seed_resultados.py)",
+      "PowerShell(Remove-Item -Path C:\\\\TFG\\\\quantvisiongc\\\\backend\\\\scripts\\\\seed_resultados.py -Confirm:$false)",
+      "PowerShell(New-Item -ItemType Directory -Force C:\\\\TFG\\\\quantvisiongc\\\\backend\\\\app\\\\services\\\\ingesta)",
+      "PowerShell(New-Item -ItemType Directory -Force C:\\\\TFG\\\\quantvisiongc\\\\backend\\\\app\\\\tests)",
+      "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"SELECT id, correo, rol FROM usuario WHERE correo='admin@test.com';\")",
+      "PowerShell(docker exec quantvisiongc_db psql -U quantvisiongc -d quantvisiongc -c \"SELECT id, correo, rol FROM usuario ORDER BY id LIMIT 5;\")",
+      "PowerShell(cd C:\\\\TFG\\\\quantvisiongc\\\\backend; $env:PYTHONIOENCODING=\"utf-8\"; python -c \"from app.services.ingesta.ingesta_service import ingestar_paquete; from app.schemas.ingesta import IngestaResponseSchema; from app.routers.admin_ingesta import router; from app.main import app; print\\('Todos los imports OK'\\); print\\('Rutas registradas:'\\); [print\\(' ', r.path\\) for r in app.routes if hasattr\\(r, 'path'\\) and 'ingesta' in r.path]\")",
+      "PowerShell(cd C:\\\\TFG\\\\quantvisiongc\\\\backend; $env:PYTHONIOENCODING=\"utf-8\"; .\\\\.venv\\\\Scripts\\\\python.exe -c \"from app.services.ingesta.ingesta_service import ingestar_paquete; from app.schemas.ingesta import IngestaResponseSchema; from app.routers.admin_ingesta import router; from app.main import app; print\\('Todos los imports OK'\\); [print\\(' ', r.path\\) for r in app.routes if hasattr\\(r, 'path'\\) and 'ingesta' in r.path]\")",
+      "Bash(python -c \"import sqlalchemy; print\\('sqlalchemy ok'\\)\")",
+      "Bash(PYTHONIOENCODING=utf-8 venv/Scripts/python.exe -m pytest app/tests/test_ingesta_paquete.py -v --tb=short)",
+      "Bash(PYTHONIOENCODING=utf-8 venv/Scripts/python.exe -m pytest app/tests/ -v --tb=short -q)",
+      "Bash(PYTHONIOENCODING=utf-8 venv/Scripts/python.exe -c ' *)",
+      "PowerShell(cd C:\\\\TFG\\\\quantvisiongc\\\\backend; $env:PYTHONIOENCODING=\"utf-8\"; venv\\\\Scripts\\\\python.exe scripts/seed_paquete.py --help)",
+      "PowerShell(cd C:\\\\TFG\\\\quantvisiongc\\\\backend; $env:PYTHONIOENCODING=\"utf-8\"; venv\\\\Scripts\\\\python.exe scripts/seed_paquete.py --zip \"C:/TFG/quantvisiongc/paquetes/paquete.zip\"; Write-Host \"Exit code: $LASTEXITCODE\")",
+      "PowerShell(cd C:\\\\TFG\\\\quantvisiongc\\\\backend; $env:PYTHONIOENCODING=\"utf-8\"; venv\\\\Scripts\\\\python.exe scripts/seed_paquete.py --zip \"C:/TFG/quantvisiongc/paquetes/paquete.zip\" --truncate --force --verbose; Write-Host \"Exit code: $LASTEXITCODE\")"
     ]
   }
 }

@@ -28,6 +28,7 @@ from app.models import (  # noqa: F401
     usuario,
     estrategia,
     resultado_estrategia,
+    metrica_estrategia,
     contratacion,
     movimiento_monedero,
 )

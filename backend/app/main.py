@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.error_handlers import generic_exception_handler, value_error_handler
-from app.routers import auth, contrataciones, dashboard, estrategias, health, monedero
+from app.routers import admin_ingesta, auth, contrataciones, dashboard, estrategias, health, monedero
 
 app = FastAPI(
     title="QuantVisionGC API",
@@ -38,6 +38,7 @@ app.include_router(estrategias.router, prefix="/api/v1")
 app.include_router(contrataciones.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(monedero.router, prefix="/api/v1")
+app.include_router(admin_ingesta.router, prefix="/api/v1")
 
 
 @app.get("/")

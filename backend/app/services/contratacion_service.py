@@ -5,11 +5,21 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.contratacion import Contratacion, EstadoContratacion
+from app.models.enums import TipoEstrategia
 from app.models.estrategia import Estrategia
 from app.models.movimiento_monedero import TipoMovimiento
 from app.models.usuario import Usuario
 from app.schemas.contratacion import ContratacionCreate
 from app.services.monedero_service import registrar_movimiento
+
+
+class BenchmarkNoContratableError(Exception):
+    """Se lanza cuando un usuario intenta contratar una estrategia de tipo 'benchmark'.
+
+    Los benchmarks son índices de referencia (SPY, NASDAQ…) disponibles solo
+    para visualización comparativa. No pueden suscribirse como estrategias de
+    inversión activas.
+    """
 
 
 def contratar_estrategia(
@@ -25,6 +35,7 @@ def contratar_estrategia(
         - None si la estrategia no existe o está inactiva.
 
     Raises:
+        - BenchmarkNoContratableError si la estrategia es de tipo 'benchmark'.
         - ValueError("contratacion_activa_existente") si ya hay una
           contratación ACTIVA del mismo usuario sobre la misma estrategia.
         - ValueError("saldo_insuficiente") si el saldo no cubre el precio.
@@ -33,6 +44,13 @@ def contratar_estrategia(
     estrategia = db.get(Estrategia, datos.id_estrategia)
     if estrategia is None or not estrategia.activa:
         return None
+
+    # 1b. Guard: los benchmarks no son contratables.
+    if estrategia.tipo == TipoEstrategia.BENCHMARK:
+        raise BenchmarkNoContratableError(
+            "No se puede contratar una estrategia de tipo 'benchmark'. "
+            "Los benchmarks solo están disponibles para uso en el comparador."
+        )
 
     # 2. El usuario no tiene ya una contratación ACTIVA sobre esta
     #    misma estrategia.
