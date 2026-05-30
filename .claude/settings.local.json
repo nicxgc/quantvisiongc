@@ -33,7 +33,15 @@
       "Bash(PYTHONIOENCODING=utf-8 venv/Scripts/python.exe -c ' *)",
       "PowerShell(cd C:\\\\TFG\\\\quantvisiongc\\\\backend; $env:PYTHONIOENCODING=\"utf-8\"; venv\\\\Scripts\\\\python.exe scripts/seed_paquete.py --help)",
       "PowerShell(cd C:\\\\TFG\\\\quantvisiongc\\\\backend; $env:PYTHONIOENCODING=\"utf-8\"; venv\\\\Scripts\\\\python.exe scripts/seed_paquete.py --zip \"C:/TFG/quantvisiongc/paquetes/paquete.zip\"; Write-Host \"Exit code: $LASTEXITCODE\")",
-      "PowerShell(cd C:\\\\TFG\\\\quantvisiongc\\\\backend; $env:PYTHONIOENCODING=\"utf-8\"; venv\\\\Scripts\\\\python.exe scripts/seed_paquete.py --zip \"C:/TFG/quantvisiongc/paquetes/paquete.zip\" --truncate --force --verbose; Write-Host \"Exit code: $LASTEXITCODE\")"
+      "PowerShell(cd C:\\\\TFG\\\\quantvisiongc\\\\backend; $env:PYTHONIOENCODING=\"utf-8\"; venv\\\\Scripts\\\\python.exe scripts/seed_paquete.py --zip \"C:/TFG/quantvisiongc/paquetes/paquete.zip\" --truncate --force --verbose; Write-Host \"Exit code: $LASTEXITCODE\")",
+      "PowerShell(cd C:\\\\TFG\\\\quantvisiongc\\\\frontend; $pkg = Get-Content package.json | ConvertFrom-Json; $deps = @{}; $pkg.dependencies.PSObject.Properties | ForEach-Object { $deps[$_.Name] = $_.Value }; $devDeps = @{}; $pkg.devDependencies.PSObject.Properties | ForEach-Object { $devDeps[$_.Name] = $_.Value }; @\\(\"react\",\"antd\",\"recharts\",\"axios\",\"react-router-dom\",\"dayjs\"\\) | ForEach-Object { Write-Host \"$_`: $\\($deps[$_]\\)\" }; Write-Host \"vite: $\\($devDeps['vite']\\)\")",
+      "PowerShell(cd C:\\\\TFG\\\\quantvisiongc\\\\frontend; Get-ChildItem src -Recurse -Filter \".gitkeep\" | Select-Object -ExpandProperty DirectoryName | ForEach-Object { $_.Replace\\(\"$PWD\\\\\", \"\"\\) } | Sort-Object)",
+      "PowerShell(Remove-Item -Force \"C:\\\\TFG\\\\quantvisiongc\\\\frontend\\\\src\\\\api\\\\.gitkeep\" -ErrorAction SilentlyContinue; Write-Host \"gitkeep eliminado: $\\(-not \\(Test-Path 'C:\\\\TFG\\\\quantvisiongc\\\\frontend\\\\src\\\\api\\\\.gitkeep'\\)\\)\")",
+      "PowerShell(Get-ChildItem \"C:\\\\TFG\\\\quantvisiongc\\\\frontend\\\\src\\\\api\" | Select-Object Name, @{N='Bytes';E={$_.Length}} | Format-Table -AutoSize)",
+      "Bash(Get-ChildItem -Path \"c:\\\\TFG\\\\quantvisiongc\\\\backend\" -Recurse -Directory)",
+      "Bash(Select-Object -First 20)",
+      "Bash(Get-ChildItem -Path \"C:\\\\TFG\\\\quantvisiongc\\\\backend\" -Recurse -Include \"*.py\")",
+      "Bash(Select-Object -First 5)"
     ]
   }
 }

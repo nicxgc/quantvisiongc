@@ -19,15 +19,14 @@ Códigos HTTP
 500  Error inesperado en la capa de persistencia (fallo de BD).
 """
 
-from __future__ import annotations
-
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_admin
+from app.core.limiter import limiter
 from app.models.usuario import Usuario
 from app.schemas.ingesta import (
     IngestaErrorSchema,
@@ -65,7 +64,9 @@ def _to_schema(errores) -> list[IngestaErrorSchema]:
         "Requiere JWT con rol **admin**."
     ),
 )
+@limiter.limit("5/hour")
 async def post_ingesta_paquete(
+    request: Request,
     response: Response,
     archivo: Annotated[UploadFile, File(description="Fichero ZIP con los tres xlsx.")],
     db: Annotated[Session, Depends(get_db)],

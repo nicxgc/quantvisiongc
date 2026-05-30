@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -11,13 +11,16 @@ from app.core.deps import get_current_user, require_admin
 from app.core.security import create_access_token
 from app.models.usuario import Usuario
 from app.schemas.usuario import LogoutResponse, UsuarioCreate, UsuarioRead
+from app.core.limiter import limiter
 from app.services.usuario_service import authenticate_usuario, create_usuario, eliminar_usuario, listar_usuarios
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
 
 
 @router.post("/users/register", response_model=UsuarioRead, status_code=status.HTTP_201_CREATED)
+@limiter.limit("3/minute")
 def register(
+    request: Request,
     data: UsuarioCreate,
     db: Annotated[Session, Depends(get_db)],
 ) -> Usuario:
@@ -26,7 +29,9 @@ def register(
 
 
 @router.post("/auth/login")
+@limiter.limit("5/minute")
 def login(
+    request: Request,
     form: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Annotated[Session, Depends(get_db)],
 ) -> dict[str, str]:
